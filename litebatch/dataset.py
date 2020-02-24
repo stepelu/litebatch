@@ -7,34 +7,32 @@ sqlite3.register_adapter(np.ndarray, serialize)
 sqlite3.register_converter("array", deserialize)
 
 
-def no_transform(row):
-    return row
-
-
 class LiteDataset:
-    def __init__(self, db_name, len_query, select_query, transform=no_transform):
+    def __init__(self, db_path, table, index, columns, transform=None):
         super().__init__()
-        self.db_name = db_name
-        self.len_query = len_query
-        self.get_query = select_query
+        self.db_path = db_path
+        self.select_query = f"select {columns} from {table} where {index}=?"
         self.transform = transform
-        self.conn = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES)
-        self.c = self.conn.cursor()
+        self._connect()
 
-    def __len__(self):
-        return self.c.execute(self.len_query).fetchone()[0]
+    def _connect(self):
+        self.connection = sqlite3.connect(
+            f"file:{self.db_path}?mode=ro",
+            uri=True,
+            detect_types=sqlite3.PARSE_DECLTYPES,
+        )
+        self.cursor = self.connection.cursor()
 
     def __getitem__(self, i):
-        row = self.c.execute(self.get_query, [i]).fetchone()
-        return self.transform(row)
+        row = self.cursor.execute(self.select_query, [int(i)]).fetchone()
+        return self.transform(row) if self.transform is not None else row
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        del state["conn"]
-        del state["c"]
+        del state["connection"]
+        del state["cursor"]
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.conn = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES)
-        self.c = self.conn.cursor()
+        self._connect()
