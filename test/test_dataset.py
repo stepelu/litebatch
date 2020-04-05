@@ -8,19 +8,18 @@ import multiprocessing as mp
 import litebatch as lb
 
 
-def create_db(db_name, table_name, image_shape, dataset):
-    # TODO: Move to litebatch?
-    conn = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_DECLTYPES)
-    c = conn.cursor()
-    c.execute(
-        f"""create table
-        {table_name}(row_id integer primary key, image array, target integer)"""
+def import_dataset(conn, table_name, dataset):
+    conn.execute(
+        f"""create table {table_name}(
+        image_id integer primary key,
+        image array,
+        target integer)"""
     )
-    for image, target in enumerate(dataset):
-        image = np.array(image).reshape(image_shape)
-        c.execute(f"insert into {table_name} values (?, ?, ?)", (None, image, target))
-    conn.commit()
-    conn.close()
+    for image, target in dataset:
+        image = np.array(image)
+        conn.execute(
+            f"insert into {table_name} values (?,?,?)", (None, image, target),
+        )
 
 
 to_tensor = torchvision.transforms.ToTensor()
@@ -38,19 +37,21 @@ if __name__ == "__main__":
     tmp_dir = os.path.expanduser("~/tmp/")
 
     if not os.path.exists(tmp_dir + "mnist.db"):
+        conn = sqlite3.connect(
+            tmp_dir + "mnist.db", detect_types=sqlite3.PARSE_DECLTYPES
+        )
         train_dataset = torchvision.datasets.MNIST(tmp_dir, train=True, download=True)
-        test_dataset = torchvision.datasets.MNIST(tmp_dir, train=False, download=True)
-        create_db(tmp_dir + "mnist.db", "train", (1, 28, 28), train_dataset)
-        create_db(tmp_dir + "mnist.db", "test", (1, 28, 28), test_dataset)
+        import_dataset(conn, "train", train_dataset)
+        conn.commit()
+        conn.close()
 
     dataset = lb.LiteDataset(
         db_path=tmp_dir + "mnist.db",
         table="train",
-        index="row_id",
+        index="image_id",
         columns="image, target",
         transform=transform,
     )
-    print(dataset.select_query)
     indices = dataset.cursor.execute("select row_id from train").fetchall()
     indices = [i[0] for i in indices]
     dataset = Subset(dataset, indices)
