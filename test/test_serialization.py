@@ -6,7 +6,7 @@ import sqlite3
 x = np.random.normal(size=[1, 28, 28]).astype(dtype=np.float32)
 
 # Round-trip OK:
-y = lb.deserialize(lb.serialize(x))
+y = lb.decode(lb.encode(x))
 assert (x == y).all()
 
 # SQLite3 registration OK:
@@ -20,5 +20,5 @@ assert (x == y).all()
 
 # Test performance:
 timeit_num = 100000
-timeit_serialize = timeit(lambda: lb.deserialize(lb.serialize(x)), number=timeit_num)
+timeit_serialize = timeit(lambda: lb.decode(lb.encode(x)), number=timeit_num)
 print(f"array <-> serialized {timeit_num} times in {timeit_serialize:.3f}")

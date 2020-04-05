@@ -1,10 +1,10 @@
 import sqlite3
 import numpy as np
-from litebatch.serialization import serialize, deserialize
+from litebatch.serialization import encode, decode
 
 
-sqlite3.register_adapter(np.ndarray, serialize)
-sqlite3.register_converter("array", deserialize)
+sqlite3.register_adapter(np.ndarray, encode)
+sqlite3.register_converter("array", decode)
 
 
 class LiteDataset:
